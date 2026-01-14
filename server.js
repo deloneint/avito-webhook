@@ -9,13 +9,14 @@ const PORT = process.env.PORT || 3000;
 const AVITO_CLIENT_ID = "V4rdxQkY1T_irD-e9XUM";
 const AVITO_CLIENT_SECRET = "KvfhnCzGlpaLIX05VOYkzJbQCGOtgEWtB3y2iZxj"; 
 // Обнови токен, если он изменился
-const REFRESH_TOKEN = "WLrabHHEQSmsAWzufdx5BwwXluZ9nB5wGS1H6cxzi4nx5zp9N-TKLGyUAmybNLTa1wPT6Q5q9uluwA-Nr1EQIzYwWgZPbme3HCJffY7eFxwpK3Z5BFCToRbhqToKP8FH"; 
+const REFRESH_TOKEN = "JzNXwUwVS0eVd7XQH3IM1QX4NkzZVEKOrX42DaQaj8f32YTohtlCh5SA2WL8pQAAmcc_nZOU7l7TlzRDWVA4kNOUaoyNI0-p-s6ISwVi0wNVaubQOc4-YAtJ_Pa0qXjP"; 
 
 // Секретный ключ. ДОЛЖЕН ТОЧНО СОВПАДАТЬ С ТОКОМ, ЧТО БЫЛ В ЛОГЕ ВКЛЮЧЕНИЯ ВЕБХУКА!
 const WEBHOOK_SECRET = "my_super_secret_1102"; 
 
 const { GoogleSpreadsheet } = require('google-spreadsheet');
-const creds = require('./credentials.json'); 
+// Считываем креды из переменной окружения Render (настроим ниже)
+const creds = JSON.parse(process.env.GOOGLE_CREDENTIALS || "{}");
 const SPREADSHEET_ID = "1SI5MxQ_-NcDRSjZvIKYEcAVgcnT2tTJxYujT33BmQOw"; 
 
 // ==========================================
