@@ -9,7 +9,7 @@ const PORT = process.env.PORT || 3000;
 const AVITO_CLIENT_ID = "V4rdxQkY1T_irD-e9XUM";
 const AVITO_CLIENT_SECRET = "KvfhnCzGlpaLIX05VOYkzJbQCGOtgEWtB3y2iZxj"; 
 // Обнови токен, если он изменился
-const REFRESH_TOKEN = "NAHBOzJ6RW6NUMmS4pyNWgmY1obgkiIubz5ZVCPIWvUQv2MRma6dwf03-wnuLzTVK07ZxGitdqH5f9oR_KilCfASKCEq33dVR2g6lP1xVCSKAxocrS5EUfifcPl0Q-Nm"; 
+const REFRESH_TOKEN = "WLrabHHEQSmsAWzufdx5BwwXluZ9nB5wGS1H6cxzi4nx5zp9N-TKLGyUAmybNLTa1wPT6Q5q9uluwA-Nr1EQIzYwWgZPbme3HCJffY7eFxwpK3Z5BFCToRbhqToKP8FH"; 
 
 // Секретный ключ. ДОЛЖЕН ТОЧНО СОВПАДАТЬ С ТОКОМ, ЧТО БЫЛ В ЛОГЕ ВКЛЮЧЕНИЯ ВЕБХУКА!
 const WEBHOOK_SECRET = "my_super_secret_1102"; 
