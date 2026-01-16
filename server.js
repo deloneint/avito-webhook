@@ -8,29 +8,73 @@ const bodyParser = require('body-parser');
 const PORT = process.env.PORT || 3000;
 const AVITO_CLIENT_ID = "V4rdxQkY1T_irD-e9XUM";
 const AVITO_CLIENT_SECRET = "KvfhnCzGlpaLIX05VOYkzJbQCGOtgEWtB3y2iZxj"; 
-// Обнови токен, если он изменился
-const REFRESH_TOKEN = "hB-b5Ly2RbmZ44mAUGn7DASUOb9s-f9siGnroraOQYxxYdaMw8LA4mbEdESjHWY5IDOnJ6kqHH7Gi4n7fxATdeE5V76STsRKoLlVP_CcT2iMRbGMqgXEp_T9aI84Eol4"; 
 
-// Секретный ключ. ДОЛЖЕН ТОЧНО СОВПАДАТЬ С ТОКОМ, ЧТО БЫЛ В ЛОГЕ ВКЛЮЧЕНИЯ ВЕБХУКА!
-const WEBHOOK_SECRET = "my_super_secret_1102"; 
-
-const { GoogleSpreadsheet } = require('google-spreadsheet');
-// Считываем креды из переменной окружения Render (настроим ниже)
+// Креды Google
 const creds = JSON.parse(process.env.GOOGLE_CREDENTIALS || "{}");
-const SPREADSHEET_ID = "1SI5MxQ_-NcDRSjZvIKYEcAVgcnT2tTJxYujT33BmQOw"; 
+const SPREADSHEET_ID = "1SI5MxQ_-NcDRSjZvIKYEcAVgcnT2tTJxYujT33BmQOw";
 
-// ==========================================
-// ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ
-// ==========================================
+// Инициализация Google Sheets
+const { GoogleSpreadsheet } = require('google-spreadsheet');
+
+// Глобальные переменные
 let accessToken = "";
+let refreshToken = ""; // Берем из таблицы
 let vacanciesCache = {}; 
-let processedIdsCache = new Set(); // Кэш ID, чтобы не писать дубликаты
+let processedIdsCache = new Set();
+let sheetConfig = null; // Лист для хранения токена
 
 const app = express();
 app.use(bodyParser.json());
 
 // ==========================================
-// ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
+// ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ (ЧТЕНИЕ/ЗАПИСЬ ТОКЕНОВ)
+// ==========================================
+
+async function initConfigSheet() {
+    const doc = await new GoogleSpreadsheet(SPREADSHEET_ID);
+    await doc.useServiceAccountAuth({
+        client_email: creds.client_email,
+        private_key: creds.private_key,
+    });
+    await doc.loadInfo();
+    
+    // Ищем лист "Config" или берем по имени
+    sheetConfig = doc.sheetsByTitle["Config"];
+    if (!sheetConfig) throw new Error("Лист Config не найден!");
+
+    // Читаем токен
+    const rows = await sheetConfig.getRows();
+    rows.forEach(row => {
+        if (row.Key === "avito_refresh_token") {
+            refreshToken = row.Value;
+        }
+    });
+
+    if (!refreshToken) {
+        console.log("❌ В таблице Config не найден токен avito_refresh_token!");
+    } else {
+        console.log("✅ Refresh Token загружен из таблицы.");
+    }
+}
+
+async function saveNewRefreshToken(newToken) {
+    if (!sheetConfig) return;
+    
+    const rows = await sheetConfig.getRows();
+    for (let i = 0; i < rows.length; i++) {
+        if (rows[i].Key === "avito_refresh_token") {
+            rows[i].Value = newToken;
+            await rows[i].save();
+            console.log("💾 Новый Refresh Token сохранен в Google Таблицу.");
+            return;
+        }
+    }
+    // Если строки не было
+    await sheetConfig.addRow({ Key: "avito_refresh_token", Value: newToken });
+}
+
+// ==========================================
+// ОБНОВЛЕНИЕ ТОКЕНА (РОТАЦИЯ)
 // ==========================================
 
 async function refreshAccessToken() {
@@ -39,16 +83,28 @@ async function refreshAccessToken() {
             grant_type: 'refresh_token',
             client_id: AVITO_CLIENT_ID,
             client_secret: AVITO_CLIENT_SECRET,
-            refresh_token: REFRESH_TOKEN
+            refresh_token: refreshToken
         }), {
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
         });
+        
         accessToken = response.data.access_token;
         console.log("🔄 Access Token обновлен");
+
+        // ЕСЛИ ПРИШЕЛ НОВЫЙ REFRESH TOKEN - СОХРАНЯЕМ ЕГО В ТАБЛИЦУ!
+        if (response.data.refresh_token && response.data.refresh_token !== refreshToken) {
+            refreshToken = response.data.refresh_token;
+            await saveNewRefreshToken(refreshToken);
+        }
+
     } catch (error) {
         console.error("❌ Ошибка обновления токена:", error.response ? error.response.data : error.message);
+        if (error.response?.status === 401) {
+            console.log("🛑 Токен в таблице умер. Нужно обновить вручную или через getTokens.js и вставить в Config.");
+        }
     }
 }
+
 // ==========================================
 // ПОЛУЧЕНИЕ ДАННЫХ ВАКАНСИИ (ФИНАЛЬНАЯ ВЕРСИЯ)
 // ==========================================
@@ -247,15 +303,28 @@ app.post('/webhook', async (req, res) => {
 // ЗАПУСК
 // ==========================================
 (async () => {
-    await refreshAccessToken();
-    await loadVacancies();
+    console.log("⏳ Инициализация системы...");
     
-    app.listen(PORT, () => {
-        console.log(`🚀 Сервер запущен на порту ${PORT}`);
-        console.log(`Webhook URL: https://tushed-rosette-imbalancedly.ngrok-free.dev/webhook`);
-    });
+    try {
+        // 1. Сначала читаем конфиг из Google Sheets
+        await initConfigSheet();
+        
+        // 2. Получаем access токен
+        await refreshAccessToken();
+        
+        // 3. Загружаем вакансии
+        await loadVacancies();
+        
+        app.listen(PORT, () => {
+            console.log(`🚀 Сервер запущен на порту ${PORT}`);
+            console.log(`Webhook URL: https://avito-bot-pcfc.onrender.com/webhook`);
+        });
 
-    // Обновление раз в час
-    setInterval(refreshAccessToken, 60 * 60 * 1000);
-    setInterval(loadVacancies, 60 * 60 * 1000);
+        // Обновляем раз в час
+        setInterval(refreshAccessToken, 60 * 60 * 1000);
+        setInterval(loadVacancies, 60 * 60 * 1000);
+        
+    } catch (e) {
+        console.error("❌ КРИТИЧЕСКАЯ ОШИБКА ПРИ ЗАПУСКЕ:", e);
+    }
 })();
