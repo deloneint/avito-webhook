@@ -8,6 +8,7 @@ const bodyParser = require('body-parser');
 const PORT = process.env.PORT || 3000;
 const AVITO_CLIENT_ID = "V4rdxQkY1T_irD-e9XUM";
 const AVITO_CLIENT_SECRET = "KvfhnCzGlpaLIX05VOYkzJbQCGOtgEWtB3y2iZxj"; 
+const WEBHOOK_SECRET = "my_super_secret_1102";
 
 // Креды Google
 const creds = JSON.parse(process.env.GOOGLE_CREDENTIALS || "{}");
